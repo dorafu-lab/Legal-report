@@ -18,7 +18,7 @@ const App: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInitialMsg, setChatInitialMsg] = useState<string | undefined>(undefined);
   
-  const [patents, setPatents] = useState<Patent[]>(MOCK_PATENTS);
+  const [patents, setPatents] = useState<Patent[]>(MOCK_PATENTS || []);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -29,6 +29,7 @@ const App: React.FC = () => {
   const [alertCount, setAlertCount] = useState(0);
 
   useEffect(() => {
+    if (!patents) return;
     const today = new Date();
     const count = patents.reduce((acc, patent) => {
         if (!patent.annuityDate) return acc;
@@ -43,7 +44,7 @@ const App: React.FC = () => {
     setAlertCount(count);
   }, [patents]);
 
-  const filteredPatents = patents.filter(patent => {
+  const filteredPatents = (patents || []).filter(patent => {
     const matchesSearch = 
         patent.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         patent.appNumber.includes(searchTerm) ||
@@ -150,12 +151,12 @@ const App: React.FC = () => {
                 <div className="space-y-2">
                     <div className="flex justify-between text-xs">
                         <span className="text-slate-500">專利總數</span>
-                        <span className="text-white font-mono">{patents.length}</span>
+                        <span className="text-white font-mono">{patents?.length || 0}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                         <span className="text-slate-500">存續率</span>
                         <span className="text-green-400 font-mono">
-                            {patents.length > 0 ? Math.round((patents.filter(p => p.status === PatentStatus.Active).length / patents.length) * 100) : 0}%
+                            {patents?.length > 0 ? Math.round((patents.filter(p => p.status === PatentStatus.Active).length / patents.length) * 100) : 0}%
                         </span>
                     </div>
                 </div>
