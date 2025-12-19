@@ -1,19 +1,7 @@
 import { GoogleGenAI, Chat, GenerateContentResponse, Type } from "@google/genai";
 import { Patent } from "../types";
 
-// Helper to get API Key safely
-const getApiKey = () => process.env.API_KEY || "";
-
-// Lazy initialization of AI to prevent top-level crashes if API Key is missing
-let aiInstance: GoogleGenAI | null = null;
-const getAI = () => {
-  if (!aiInstance) {
-    const key = getApiKey();
-    aiInstance = new GoogleGenAI({ apiKey: key });
-  }
-  return aiInstance;
-};
-
+// System instruction for the patent assistant assistant
 const SYSTEM_INSTRUCTION = `
 You are an expert Patent Attorney and Intellectual Property Consultant assistant. 
 Your role is to help users manage their patent portfolio.
@@ -24,9 +12,10 @@ If asked about a specific patent, refer to the provided details.
 
 let chatSession: Chat | null = null;
 
+// Always initialize chat session using process.env.API_KEY directly
 export const getChatSession = (): Chat => {
   if (!chatSession) {
-    const ai = getAI();
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     chatSession = ai.chats.create({
       model: 'gemini-3-flash-preview',
       config: {
@@ -37,9 +26,8 @@ export const getChatSession = (): Chat => {
   return chatSession;
 };
 
+// Send message to Gemini using the persistent chat session
 export const sendMessageToGemini = async (message: string, contextPatents?: Patent[]): Promise<string> => {
-  if (!getApiKey()) return "尚未設定 API Key，無法使用 AI 功能。";
-  
   try {
     const chat = getChatSession();
     let fullMessage = message;
@@ -60,13 +48,12 @@ export const sendMessageToGemini = async (message: string, contextPatents?: Pate
   }
 };
 
+// Evaluate patent risks using generateContent
 export const analyzePatentRisk = async (patent: Patent): Promise<string> => {
-    if (!getApiKey()) return "尚未設定 API Key。";
-    
     const prompt = `請針對以下專利進行維護風險評估 (繁體中文): 專利名稱: ${patent.name}, 狀態: ${patent.status}, 年費到期日: ${patent.annuityDate}`;
 
     try {
-        const ai = getAI();
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: prompt
@@ -78,6 +65,7 @@ export const analyzePatentRisk = async (patent: Patent): Promise<string> => {
     }
 }
 
+// Configuration for structured JSON output
 const PATENT_SCHEMA_CONFIG = {
   responseMimeType: "application/json",
   responseSchema: {
@@ -102,12 +90,12 @@ const PATENT_SCHEMA_CONFIG = {
   },
 };
 
+// Parse patent information from text using generateContent with JSON schema
 export const parsePatentFromText = async (text: string): Promise<Partial<Patent> | null> => {
-  if (!getApiKey()) return null;
   const prompt = `Analyze patent information into JSON: ${text}`;
 
   try {
-    const ai = getAI();
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
@@ -121,12 +109,12 @@ export const parsePatentFromText = async (text: string): Promise<Partial<Patent>
   }
 };
 
+// Parse patent information from file content (PDF/Image) using multimodal input
 export const parsePatentFromFile = async (base64Data: string, mimeType: string = 'application/pdf'): Promise<Partial<Patent> | null> => {
-  if (!getApiKey()) return null;
   const prompt = `Extract patent info into JSON from this file.`;
 
   try {
-    const ai = getAI();
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
