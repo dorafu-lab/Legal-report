@@ -1,9 +1,19 @@
 import { GoogleGenAI, Chat, GenerateContentResponse, Type } from "@google/genai";
 import { Patent } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper to get API Key safely
+const getApiKey = () => process.env.API_KEY || "";
 
-// System instruction to guide the AI to be a patent expert
+// Lazy initialization of AI to prevent top-level crashes if API Key is missing
+let aiInstance: GoogleGenAI | null = null;
+const getAI = () => {
+  if (!aiInstance) {
+    const key = getApiKey();
+    aiInstance = new GoogleGenAI({ apiKey: key });
+  }
+  return aiInstance;
+};
+
 const SYSTEM_INSTRUCTION = `
 You are an expert Patent Attorney and Intellectual Property Consultant assistant. 
 Your role is to help users manage their patent portfolio.
@@ -16,8 +26,9 @@ let chatSession: Chat | null = null;
 
 export const getChatSession = (): Chat => {
   if (!chatSession) {
+    const ai = getAI();
     chatSession = ai.chats.create({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
       },
@@ -27,15 +38,15 @@ export const getChatSession = (): Chat => {
 };
 
 export const sendMessageToGemini = async (message: string, contextPatents?: Patent[]): Promise<string> => {
+  if (!getApiKey()) return "尚未設定 API Key，無法使用 AI 功能。";
+  
   try {
     const chat = getChatSession();
-    
     let fullMessage = message;
     
-    // If context is provided (e.g., current filtered list or selected patent), inject it into the prompt
     if (contextPatents && contextPatents.length > 0) {
       const patentContextString = contextPatents.map(p => 
-        `ID: ${p.id}, 名稱: ${p.name}, 專利權人: ${p.patentee}, 狀態: ${p.status}, 國家: ${p.country}, 發明人: ${p.inventor}, 類型: ${p.type}, 年費到期日: ${p.annuityDate}`
+        `ID: ${p.id}, 名稱: ${p.name}, 狀態: ${p.status}, 國家: ${p.country}, 年費到期日: ${p.annuityDate}`
       ).join('\n');
       
       fullMessage = `Here is the context of the patents I am currently viewing:\n${patentContextString}\n\nUser Question: ${message}`;
@@ -50,28 +61,14 @@ export const sendMessageToGemini = async (message: string, contextPatents?: Pate
 };
 
 export const analyzePatentRisk = async (patent: Patent): Promise<string> => {
-    const prompt = `
-    請針對以下專利進行簡單的維護風險評估與建議 (請用繁體中文回答):
+    if (!getApiKey()) return "尚未設定 API Key。";
     
-    專利名稱: ${patent.name}
-    專利權人: ${patent.patentee}
-    申請國家: ${patent.country}
-    專利類型: ${patent.type}
-    發明人: ${patent.inventor}
-    狀態: ${patent.status}
-    申請日: ${patent.appDate}
-    年費有效年次: ${patent.annuityYear}
-    年費有效日期: ${patent.annuityDate}
-
-    請分析重點:
-    1. 剩餘壽命價值
-    2. 是否接近年費繳納期限
-    3. 基於專利類型的一般性建議
-    `;
+    const prompt = `請針對以下專利進行維護風險評估 (繁體中文): 專利名稱: ${patent.name}, 狀態: ${patent.status}, 年費到期日: ${patent.annuityDate}`;
 
     try {
+        const ai = getAI();
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt
         });
         return response.text || "無法生成分析報告。";
@@ -81,7 +78,6 @@ export const analyzePatentRisk = async (patent: Patent): Promise<string> => {
     }
 }
 
-// Reusable config for JSON schema response
 const PATENT_SCHEMA_CONFIG = {
   responseMimeType: "application/json",
   responseSchema: {
@@ -102,41 +98,23 @@ const PATENT_SCHEMA_CONFIG = {
       inventor: { type: Type.STRING },
       abstract: { type: Type.STRING },
     },
+    required: ["name"]
   },
 };
 
 export const parsePatentFromText = async (text: string): Promise<Partial<Patent> | null> => {
-  const prompt = `
-  Analyze the provided text and extract patent information into a JSON object.
-  The input text might be messy or unstructured. Try to find the following fields.
-  
-  Mapping Rules:
-  - status: Must be mapped to one of ['存續中', '已屆期', '審查中']. Default to '審查中' if unsure.
-  - type: Must be mapped to one of ['發明', '新型', '設計']. Default to '發明' if unsure.
-  - country: Format as "Code (Name)", e.g., "TW (台灣)".
-  - dates: Format all dates as YYYY-MM-DD.
-  - duration: Try to infer or find the patent duration range.
-  - annuityYear: Extract numeric value only.
-  - inventor: Extract the names of inventors or creators (e.g. from "發明人", "創作人", "Inventor", "Creator").
-  - patentee: Extract the name of the patent owner or assignee (e.g. from "專利權人", "申請人", "Assignee", "Applicant").
-
-  Text to Parse:
-  """
-  ${text}
-  """
-  `;
+  if (!getApiKey()) return null;
+  const prompt = `Analyze patent information into JSON: ${text}`;
 
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: PATENT_SCHEMA_CONFIG,
     });
 
-    if (response.text) {
-      return JSON.parse(response.text) as Partial<Patent>;
-    }
-    return null;
+    return response.text ? JSON.parse(response.text) : null;
   } catch (error) {
     console.error("Gemini Parse Text Error:", error);
     return null;
@@ -144,41 +122,23 @@ export const parsePatentFromText = async (text: string): Promise<Partial<Patent>
 };
 
 export const parsePatentFromFile = async (base64Data: string, mimeType: string = 'application/pdf'): Promise<Partial<Patent> | null> => {
-  const prompt = `
-  Analyze the attached patent document (likely a gazette or certificate) and extract patent information into a JSON object.
-  
-  Mapping Rules:
-  - status: Must be mapped to one of ['存續中', '已屆期', '審查中']. Default to '審查中' if unsure.
-  - type: Must be mapped to one of ['發明', '新型', '設計']. Default to '發明' if unsure.
-  - country: Format as "Code (Name)", e.g., "TW (台灣)".
-  - dates: Format all dates as YYYY-MM-DD.
-  - duration: Try to infer or find the patent duration range.
-  - annuityYear: Extract numeric value only.
-  - inventor: Extract the names of inventors or creators.
-  - patentee: Extract the name of the patent owner or assignee (e.g. "專利權人", "Assignee").
-  `;
+  if (!getApiKey()) return null;
+  const prompt = `Extract patent info into JSON from this file.`;
 
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: {
         parts: [
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Data
-            }
-          },
+          { inlineData: { mimeType, data: base64Data } },
           { text: prompt }
         ]
       },
       config: PATENT_SCHEMA_CONFIG,
     });
 
-    if (response.text) {
-      return JSON.parse(response.text) as Partial<Patent>;
-    }
-    return null;
+    return response.text ? JSON.parse(response.text) : null;
   } catch (error) {
     console.error("Gemini Parse File Error:", error);
     return null;

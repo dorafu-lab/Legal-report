@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, X, Sparkles, Loader2 } from 'lucide-react';
 import { ChatMessage } from '../types';
@@ -68,7 +69,8 @@ const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose, contextPatents, initia
             </div>
             <div>
                 <h3 className="font-semibold text-sm">AI 專利助手</h3>
-                <p className="text-[10px] text-blue-100 opacity-90">Powered by Gemini 2.5</p>
+                {/* Updated label to reflect the Gemini 3 model being used */}
+                <p className="text-[10px] text-blue-100 opacity-90">Powered by Gemini 3</p>
             </div>
         </div>
         <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors">

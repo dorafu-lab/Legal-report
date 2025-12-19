@@ -1,20 +1,26 @@
+
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+// Explicitly import process from Node.js to resolve type conflicts in the Vite config environment
+import process from 'node:process';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  // Set the third parameter to '' to load all env vars regardless of the `VITE_` prefix.
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
     plugins: [react()],
     base: '/Legal-report/',
     define: {
-      // Effectively replaces `process.env.API_KEY` with the actual string value during build
-      'process.env.API_KEY': JSON.stringify(env.API_KEY),
-      // Shims `process.env` to prevent "ReferenceError: process is not defined"
+      // Safely handle API_KEY, default to empty string if missing
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || ""),
+      // Essential shim for libraries that expect process.env to exist
+      'process.env.NODE_ENV': JSON.stringify(mode),
       'process.env': {},
     },
+    build: {
+      outDir: 'dist',
+      sourcemap: false,
+    }
   };
 });
