@@ -1,20 +1,17 @@
 import { GoogleGenAI, Chat, GenerateContentResponse, Type } from "@google/genai";
 import { Patent } from "../types";
 
-// System instruction for the patent assistant assistant
 const SYSTEM_INSTRUCTION = `
-You are an expert Patent Attorney and Intellectual Property Consultant assistant. 
-Your role is to help users manage their patent portfolio.
-You analyze patent data, suggest strategies for annuity payments, and explain technical patent terms in Traditional Chinese (zh-TW).
-Always be professional, concise, and helpful.
-If asked about a specific patent, refer to the provided details.
+你是一位專業的專利代理人與智慧財產權顧問助手。
+你的職責是協助用戶管理專利組合，分析專利風險，提供年費維持建議。
+請使用繁體中文 (zh-TW) 回答，保持專業、簡潔且精確。
 `;
 
 let chatSession: Chat | null = null;
 
-// Always initialize chat session using process.env.API_KEY directly
 export const getChatSession = (): Chat => {
   if (!chatSession) {
+    // 嚴格遵守：使用 process.env.API_KEY
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     chatSession = ai.chats.create({
       model: 'gemini-3-flash-preview',
@@ -26,46 +23,27 @@ export const getChatSession = (): Chat => {
   return chatSession;
 };
 
-// Send message to Gemini using the persistent chat session
 export const sendMessageToGemini = async (message: string, contextPatents?: Patent[]): Promise<string> => {
   try {
     const chat = getChatSession();
     let fullMessage = message;
     
     if (contextPatents && contextPatents.length > 0) {
-      const patentContextString = contextPatents.map(p => 
-        `ID: ${p.id}, 名稱: ${p.name}, 狀態: ${p.status}, 國家: ${p.country}, 年費到期日: ${p.annuityDate}`
+      const patentContextString = contextPatents.slice(0, 10).map(p => 
+        `[ID: ${p.id}, 名稱: ${p.name}, 狀態: ${p.status}, 國家: ${p.country}, 到期日: ${p.annuityDate}]`
       ).join('\n');
       
-      fullMessage = `Here is the context of the patents I am currently viewing:\n${patentContextString}\n\nUser Question: ${message}`;
+      fullMessage = `當前專利上下文：\n${patentContextString}\n\n用戶問題：${message}`;
     }
 
     const response: GenerateContentResponse = await chat.sendMessage({ message: fullMessage });
     return response.text || "抱歉，我現在無法回答您的問題。";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "發生錯誤，請檢查您的網路連線或 API Key 設定。";
+    return "發生錯誤。請確認您的環境變數 API_KEY 是否正確配置。";
   }
 };
 
-// Evaluate patent risks using generateContent
-export const analyzePatentRisk = async (patent: Patent): Promise<string> => {
-    const prompt = `請針對以下專利進行維護風險評估 (繁體中文): 專利名稱: ${patent.name}, 狀態: ${patent.status}, 年費到期日: ${patent.annuityDate}`;
-
-    try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt
-        });
-        return response.text || "無法生成分析報告。";
-    } catch (e) {
-        console.error(e);
-        return "分析服務暫時無法使用。";
-    }
-}
-
-// Configuration for structured JSON output
 const PATENT_SCHEMA_CONFIG = {
   responseMimeType: "application/json",
   responseSchema: {
@@ -90,15 +68,12 @@ const PATENT_SCHEMA_CONFIG = {
   },
 };
 
-// Parse patent information from text using generateContent with JSON schema
 export const parsePatentFromText = async (text: string): Promise<Partial<Patent> | null> => {
-  const prompt = `Analyze patent information into JSON: ${text}`;
-
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: prompt,
+      contents: `請將以下專利資訊解析為 JSON 格式：\n${text}`,
       config: PATENT_SCHEMA_CONFIG,
     });
 
@@ -109,10 +84,7 @@ export const parsePatentFromText = async (text: string): Promise<Partial<Patent>
   }
 };
 
-// Parse patent information from file content (PDF/Image) using multimodal input
 export const parsePatentFromFile = async (base64Data: string, mimeType: string = 'application/pdf'): Promise<Partial<Patent> | null> => {
-  const prompt = `Extract patent info into JSON from this file.`;
-
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -120,7 +92,7 @@ export const parsePatentFromFile = async (base64Data: string, mimeType: string =
       contents: {
         parts: [
           { inlineData: { mimeType, data: base64Data } },
-          { text: prompt }
+          { text: "請從此文件中提取專利資訊並轉換為 JSON 格式。" }
         ]
       },
       config: PATENT_SCHEMA_CONFIG,
