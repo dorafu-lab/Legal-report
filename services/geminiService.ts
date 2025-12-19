@@ -9,9 +9,12 @@ const SYSTEM_INSTRUCTION = `
 
 let chatSession: Chat | null = null;
 
+/**
+ * 取得或初始化 Gemini 對話 Session
+ */
 export const getChatSession = (): Chat => {
   if (!chatSession) {
-    // 嚴格遵守：使用 process.env.API_KEY
+    // 嚴格遵守安全性規範：僅從環境變數讀取 API Key
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     chatSession = ai.chats.create({
       model: 'gemini-3-flash-preview',
@@ -23,6 +26,9 @@ export const getChatSession = (): Chat => {
   return chatSession;
 };
 
+/**
+ * 發送訊息給 Gemini 並獲取回應
+ */
 export const sendMessageToGemini = async (message: string, contextPatents?: Patent[]): Promise<string> => {
   try {
     const chat = getChatSession();
@@ -40,7 +46,7 @@ export const sendMessageToGemini = async (message: string, contextPatents?: Pate
     return response.text || "抱歉，我現在無法回答您的問題。";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "發生錯誤。請確認您的環境變數 API_KEY 是否正確配置。";
+    return "連線錯誤，請確認網路狀態或 API 配置。";
   }
 };
 
@@ -68,6 +74,9 @@ const PATENT_SCHEMA_CONFIG = {
   },
 };
 
+/**
+ * 使用 AI 解析純文字中的專利資訊
+ */
 export const parsePatentFromText = async (text: string): Promise<Partial<Patent> | null> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -84,6 +93,9 @@ export const parsePatentFromText = async (text: string): Promise<Partial<Patent>
   }
 };
 
+/**
+ * 使用 AI 解析檔案（如 PDF）中的專利資訊
+ */
 export const parsePatentFromFile = async (base64Data: string, mimeType: string = 'application/pdf'): Promise<Partial<Patent> | null> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
