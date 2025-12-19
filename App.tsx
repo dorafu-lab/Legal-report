@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInitialMsg, setChatInitialMsg] = useState<string | undefined>(undefined);
   
+  // 增加空陣列防護
   const [patents, setPatents] = useState<Patent[]>(MOCK_PATENTS || []);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -106,7 +107,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans">
+    <div className="min-h-screen bg-slate-50 flex font-sans overflow-hidden">
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 text-slate-300 hidden lg:flex flex-col border-r border-slate-800">
         <div className="p-6 border-b border-slate-800 flex items-center gap-3">
@@ -116,7 +117,7 @@ const App: React.FC = () => {
           <span className="text-white font-bold text-lg tracking-tight">PatentVault</span>
         </div>
         
-        <nav className="flex-1 py-6 px-3 space-y-1">
+        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto custom-scrollbar">
           <button 
             onClick={() => setViewMode('dashboard')}
             className={`flex items-center w-full px-3 py-2.5 rounded-lg text-sm transition-all ${viewMode === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'hover:bg-slate-800'}`}
@@ -178,7 +179,7 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 lg:px-8 shadow-sm z-10">
+        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 lg:px-8 shadow-sm z-10 shrink-0">
             <div className="flex items-center lg:hidden gap-3">
                  <button className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg">
                     <Menu size={20} />
@@ -223,8 +224,8 @@ const App: React.FC = () => {
             </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-6 lg:p-10 custom-scrollbar">
-            <div className="max-w-7xl mx-auto space-y-8">
+        <div className="flex-1 overflow-y-auto p-6 lg:p-10 custom-scrollbar">
+            <div className="max-w-7xl mx-auto space-y-8 pb-12">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
